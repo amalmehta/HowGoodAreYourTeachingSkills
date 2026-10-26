@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How Good Are Your Teaching Skills?</title>
+  <meta name="description" content="18 short teaching scenarios, about 8 minutes. See which of six teaching skills to practise next, with the research behind every answer.">
+  <meta name="theme-color" content="#FAF7F2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#171513" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="How Good Are Your Teaching Skills?">
+  <meta property="og:description" content="18 teaching scenarios. Find the one skill to practise next.">
+  <meta property="og:image" content="assets/icon-512.png">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <link rel="stylesheet" href="assets/style.css">
+  <script>
+    // Apply the saved theme before first paint to avoid a flash.
+    try {
+      const t = JSON.parse(localStorage.getItem('hgats.v1') || '{}').prefs?.theme;
+      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    } catch {}
+  </script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#/" aria-label="Home">
+      <img src="assets/icon.svg" alt="" width="28" height="28">
+      <span>How Good Are Your Teaching Skills?</span>
+    </a>
+    <nav>
+      <a href="#/method" class="navlink" data-nav="method">How it's scored</a>
+      <button class="icon-btn" id="open-settings" aria-label="Settings (⌘,)" title="Settings (⌘,)"></button>
+    </nav>
+  </header>
+
+  <main id="view" tabindex="-1"></main>
+
+  <button class="feedback-tab" id="open-feedback" aria-label="Send feedback"></button>
+
+  <dialog id="settings" aria-labelledby="settings-title"></dialog>
+  <dialog id="feedback" aria-labelledby="feedback-title"></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <noscript><p class="noscript">This quiz needs JavaScript to run.</p></noscript>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
