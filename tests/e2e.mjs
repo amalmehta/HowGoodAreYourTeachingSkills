@@ -27,6 +27,14 @@ async function newPage(opts = {}) {
   return page;
 }
 
+// The guess step: pick one band for every skill, or skip with null.
+async function guessStep(page, b) {
+  await page.waitForSelector('.guess-list');
+  if (b === null) return page.click('[data-act="skip-guess"]');
+  for (const k of SKILLS) await page.click(`[data-guess="${k.id}"][data-band="${b}"]`);
+  await page.keyboard.press('Enter');
+}
+
 // Plays a run. strategy(scenario) → original option index to pick.
 async function playRun(page, strategy, { shotAt = -1, shotName } = {}) {
   const picks = [];
@@ -39,10 +47,12 @@ async function playRun(page, strategy, { shotAt = -1, shotName } = {}) {
     const want = strategy(s);
     const texts = await page.$$eval('.opt .txt', (els) => els.map((e) => e.firstChild.textContent));
     const pos = texts.indexOf(s.options[want].text);
+    if (q === 0) check(await page.isVisible('.chip.concealed') && !(await page.textContent('#skill-chip')).includes(SKILLS.find((k) => k.id === s.skill).name), 'skill label is hidden before answering');
     const t0 = Date.now();
     await page.keyboard.press(String(pos + 1));
     await page.waitForSelector('#opts.answered');
     latencies.push(Date.now() - t0);
+    if (q === 0) check((await page.textContent('#skill-chip')).includes(SKILLS.find((k) => k.id === s.skill).name), 'skill label appears after answering');
     if (q === shotAt) await page.waitForTimeout(300);
     if (q === shotAt) await page.screenshot({ path: `${SHOTS}/${shotName}.png` });
     picks.push(s);
@@ -72,12 +82,24 @@ const weakCheck = (s) => (s.skill === 'check' ? worst(s) : best(s));
   await page.screenshot({ path: `${SHOTS}/home-light.png` });
 
   await page.keyboard.press('Enter');
+  await page.waitForSelector('.guess-list');
+  check(await page.isDisabled('[data-act="guess-done"]'), 'guess step: Start is disabled until all six are picked');
+  await page.click('[data-guess="explain"][data-band="Solid"]');
+  await page.reload();
+  await page.waitForSelector('.guess-list');
+  check(await page.getAttribute('[data-guess="explain"][data-band="Solid"]', 'aria-checked') === 'true', 'a guess survives reload');
+  await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300);
+  await page.screenshot({ path: `${SHOTS}/guess-light.png` });
+  await guessStep(page, 'Strong');
   const { picks, latencies } = await playRun(page, weakCheck, { shotAt: 2, shotName: 'quiz-light' });
   const exp = expected(picks, weakCheck);
   const shown = Number((await page.textContent('.big')).match(/\d+/)[0]);
   check(shown === exp.overall, `result shows overall ${shown}, expected ${exp.overall}`);
   check((await page.textContent('.focus-card .chip')).includes('Checking understanding'), 'weakest skill is Checking understanding');
   check(new Set(picks.map((s) => s.id)).size === 18, '18 distinct scenarios in run 1');
+  const checkRow = await page.textContent('.calib-row.over');
+  check(checkRow.includes('Checking understanding') && checkRow.includes('Over-confident · 2 bands'), 'calibration: guessed Strong on Checking, scored Start here → over-confident by 2 bands');
+  check((await page.$$('.calib-row.even')).length === 5, 'calibration: the five all-best skills are calibrated');
   const maxLat = Math.max(...latencies);
   check(maxLat < 100, `answer feedback appears in under 100 ms (max ${maxLat} ms, median ${latencies.sort((a, b) => a - b)[9]} ms, incl. test overhead)`);
   await page.waitForTimeout(700);
@@ -110,6 +132,7 @@ const weakCheck = (s) => (s.skill === 'check' ? worst(s) : best(s));
   check(run2.every((id) => !picks.some((s) => s.id === id)), 'retake draws 18 unseen scenarios');
 
   // Resume after leaving mid-quiz
+  await guessStep(page, null);
   await page.waitForSelector('.prompt');
   await page.keyboard.press('1'); await page.keyboard.press('Enter');
   await page.keyboard.press('2'); await page.keyboard.press('Enter');
@@ -120,7 +143,7 @@ const weakCheck = (s) => (s.skill === 'check' ? worst(s) : best(s));
   // Method page with KaTeX
   await page.goto(`${BASE}#/method`);
   await page.waitForSelector('.katex', { timeout: 5000 }).catch(() => {});
-  check((await page.$$('.eq .katex')).length === 3, 'three equations typeset by KaTeX');
+  check((await page.$$('.eq .katex')).length === 4, 'four equations typeset by KaTeX');
   await page.screenshot({ path: `${SHOTS}/method-light.png` });
 
   // Settings via ⌘,
@@ -140,6 +163,7 @@ const weakCheck = (s) => (s.skill === 'check' ? worst(s) : best(s));
   // Explain-after-each off: auto-advance
   await page.evaluate(() => { const d = JSON.parse(localStorage.getItem('hgats.v1')); d.prefs.explainAfterEach = false; d.inProgress = null; localStorage.setItem('hgats.v1', JSON.stringify(d)); });
   await page.goto(`${BASE}#/quiz`); await page.reload();
+  await guessStep(page, null);
   await page.waitForSelector('.prompt');
   await page.keyboard.press('1');
   await page.waitForFunction(() => document.querySelector('.progress span')?.textContent.startsWith('2 /'));
@@ -163,8 +187,13 @@ const weakCheck = (s) => (s.skill === 'check' ? worst(s) : best(s));
   check(bg === 'rgb(23, 21, 19)', `dark background applied (${bg})`);
   await page.screenshot({ path: `${SHOTS}/home-dark.png` });
   await page.keyboard.press('Enter');
+  await page.waitForSelector('.guess-list');
+  await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300);
+  await page.screenshot({ path: `${SHOTS}/guess-dark.png` });
+  await guessStep(page, null);
   const { picks } = await playRun(page, best, { shotAt: 4, shotName: 'quiz-dark' });
   check((await page.textContent('.big')).startsWith('100'), 'all-best run scores 100');
+  check(await page.isVisible('text=You skipped the guess'), 'skipped guess: result explains there is nothing to compare');
   await page.waitForTimeout(700);
   await page.screenshot({ path: `${SHOTS}/result-dark.png`, fullPage: true });
   await page.goto(`${BASE}#/method`);
@@ -184,6 +213,10 @@ const weakCheck = (s) => (s.skill === 'check' ? worst(s) : best(s));
     check(over <= 0, `no horizontal scroll at 375px on ${route || 'home'} (${over}px)`);
   }
   await page.goto(BASE + '#/quiz');
+  await page.waitForSelector('.guess-list');
+  await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300);
+  await page.screenshot({ path: `${SHOTS}/guess-phone.png` });
+  await guessStep(page, 'Solid');
   await page.waitForSelector('.opt');
   await page.tap('.opt');
   await page.waitForSelector('#opts.answered');

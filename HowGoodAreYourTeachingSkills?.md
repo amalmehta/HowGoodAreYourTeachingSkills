@@ -337,16 +337,19 @@ CONTEXT:
 
 Project type: Website (a mostly static site to read and browse).
 
-survey app that figures out teaching skill. also a website
+For a mentor in any field (first user: Amal, about his own mentees) who wants to choose one teaching skill to practise this month, but can't get honest feedback because mentees rarely criticise their mentor. Asking yourself fails too: self-ratings mostly measure confidence (self-report bias). So the site first asks for a quick guess at each of 6 skills, then measures teaching judgment with cited scenario questions, shows the gap between guess and result, and ends with the weakest skill and one drill. It measures judgment (knowing the better move), not observed skill, and says so. It's worth it if, a month later, the mentor has done the drill in at least 2 sessions and the mentee can name what changed. It already exists as v1, a static site on GitHub Pages; this spec re-scopes v1 rather than starting over.
 
 DELIVERABLES:
 
 <What you want at the end: the app, files, links. One per line.>
 
-- A static website: a scenario quiz of 18 questions in about 8 minutes, giving a profile of teaching judgment across 6 skills, the weakest skill, and one drill to practise next.
-- A public GitHub repo, HowGoodAreYourTeachingSkills, served on GitHub Pages.
-- README (visuals and links), docs/INSTRUCTIONS.md, docs/SYSTEM-DESIGN.md, docs/FILE-STRUCTURE.md, docs/PROMPTS.md, docs/REVIEW-CHECKLIST.md.
-- Automated tests: logic, content validation and a headless-browser end-to-end run, plus a citation check against Crossref.
+- The v1 static site, kept: 18 scenarios drawn from a bank of 36, a judgment profile across 6 skills, the weakest skill, and one drill to practise next.
+- A self-guess step before the scenarios: one question per skill ("Start here", "Solid" or "Strong"), taking under a minute.
+- A calibration view in the results: guessed band vs scored band for each skill, with over- or under-confidence marked.
+- On each scenario, the skill label is hidden until the person has answered, so the guess can't steer the answer.
+- The public GitHub repo HowGoodAreYourTeachingSkills, on GitHub Pages; answers stay in the browser's localStorage, with no backend.
+- Updated docs (README, docs/INSTRUCTIONS.md, docs/SYSTEM-DESIGN.md, docs/FILE-STRUCTURE.md, docs/PROMPTS.md, docs/REVIEW-CHECKLIST.md) covering the self-guess and the calibration view.
+- Updated tests: calibration-gap logic, the label staying hidden until an answer, and the existing content, end-to-end and Crossref checks still passing.
 
 DECISIONS FROM Q&A (2026-10-26):
 
@@ -361,6 +364,17 @@ DECISIONS FROM Q&A (2026-10-26):
 - Form: static website only (no Mac app, because people take a survey once, from a link). No backend, no accounts, no analytics. All data stays in localStorage.
 - Repo/host: public repo HowGoodAreYourTeachingSkills, pushed, served on GitHub Pages.
 
+DECISIONS FROM Q&A (2026-10-26, re-scope; these replace the matching lines above):
+
+- Who for: a mentor in any field. The first user is Amal, about his own mentees. Replaces "anyone who explains things".
+- Decision it informs: which one skill to practise this month.
+- Why a quiz rather than asking the mentee: mentees aren't candid with their mentor because of the power gap.
+- Method: scenarios plus a self-guess beforehand, with the gap between them shown. Self-ratings alone are rejected because of self-report bias. Mentee ratings are deferred: they need a second person and a backend, and are still inflated by the power gap.
+- Success, one month on: the drill was done in 2+ sessions, and the mentee can name what changed.
+- Form: keep the static site. A Google Form can't draw from a bank, compute 6 skill scores or show the calibration gap. Keeping v1 is not the reason (that would be sunk cost).
+- Hosting: unchanged (Pages, localStorage only, public repo).
+- Trade-off Amal named: anchoring (guessing first can steer the answers). Mitigated by hiding the skill label until the person has answered.
+
 DEFINITIONS AND DEFERRED:
 
 <Agent fills in: each vague term with its threshold, formula or done criterion, and what's deferred.>
@@ -370,6 +384,7 @@ DEFINITIONS AND DEFERRED:
 - Skill score: S = 100 · (points earned on the skill's 3 questions) / 9, rounded to the nearest whole number.
 - Overall score: the mean of the 6 skill scores, rounded.
 - Bands (invented thresholds, labelled as such in the UI): 0–44 "Start here", 45–77 "Solid", 78–100 "Strong". With only 3 questions per skill, one question moves a score by up to 33 points. The UI says so, and skill scores are shown with their band rather than treated as precise.
+- Calibration gap: for each skill, the scored band minus the guessed band, counted in band steps (−2 to +2). Below 0 means over-confident, above 0 under-confident, 0 means calibrated. It's done in bands, not points, because one question moves a skill score by 33 points and a points gap would be mostly noise.
 - Weakest skill: the lowest skill score. Ties go to the skill listed first in the fixed order (Explaining, Examples, Checking, Feedback, Practice, Difficulty).
 - Done for the MVP: all 36 scenarios validate (4 options, exactly one 3-point option, every source resolves), every cited DOI resolves on Crossref, an end-to-end headless run passes in light and dark modes, and the site is live on Pages.
 - Deferred: learner-rating mode (others rate you), live/recorded practice assessed by AI, translations, population norms (comparing you to others needs a backend), a print/PDF certificate, a hidden game, and validation of the questions against real teaching outcomes.
@@ -382,6 +397,15 @@ OPEN QUESTIONS / ASSUMPTIONS:
 - Assumed the scenarios are domain-general (code, maths, cooking, sport, workplace), so anyone who explains things can relate to them.
 - Assumed the feedback tab opens a prefilled GitHub issue, because there is no backend.
 - Unvalidated: no psychometric validation has been done. The scores are a structured self-check, not a measurement instrument. The site says so.
+- Guess (2026-10-26): the self-guess uses the same 3 bands as the results, not a 1–5 scale, so the guess and the score can be compared directly.
+- Guess: hiding the skill label until after an answer is enough to curb anchoring. Untested. Check by comparing guess–score agreement with the label shown vs hidden, once there are enough runs.
+- Guess: Amal is a contaminated first user. He has seen the spec and the answer key lives in this repo. At least one mentor who hasn't seen the key must take it before anyone trusts the results.
+- Guess: success is checked outside the app. Amal asks his mentee a month later; no in-app follow-up is built.
+- Guess: the self-guess adds little drop-off (under 1 minute). Unmeasured, since there are no analytics.
+- Resolved (2026-10-26): v1 now has the self-guess, the calibration view and the hidden skill label.
+- Guess (2026-10-26): the guess step can be skipped, so someone in a hurry isn't blocked; the result then explains there's nothing to compare. If most people skip it, the calibration feature isn't earning its place, but with no analytics only asking users will tell.
+- Guess: the result's one-line summary ("Mostly, you rated yourself higher than you scored") appears only when over- or under-confident skills outnumber all the others. Otherwise it reads as "close overall".
+- Open: "mentor in any field" is still a group, not a person. If Amal's mentees are all in tech, the domain-general scenarios may be broader than they need to be.
 
 CHANGELOG:
 
@@ -433,3 +457,5 @@ CHANGELOG:
 - 2026-10-25 — added meta-instruction: use sub-agents when they help (parallel independent work, heavy reading, unanchored second opinions), with full briefs, and check what they return
 - 2026-10-26 — filled DELIVERABLES, DECISIONS FROM Q&A, DEFINITIONS AND DEFERRED, OPEN QUESTIONS
 - 2026-10-26 — built v1: static scenario-quiz site, 36 cited scenarios, tests, docs; published to GitHub Pages
+- 2026-10-26 — re-scoped: rewrote CONTEXT (one mentor, one decision), refilled DELIVERABLES (self-guess, calibration view, hidden skill label), added re-scope decisions, defined the calibration gap, recorded guesses
+- 2026-10-26 — built the re-scope into v1: skippable self-guess step, skill label hidden until each answer, calibration table on the result page and formula on the method page; tests and docs updated (not yet committed)

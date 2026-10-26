@@ -113,6 +113,16 @@ kbd { font: 500 .75rem var(--sans); border: 1px solid var(--line); border-bottom
 .progress .bar { flex: 1; height: 6px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
 .progress .bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; transition: width 250ms var(--ease); }
 .chip { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--c); }
+.chip.concealed { color: var(--muted); }
+.guess-list { display: grid; gap: 10px; margin-top: 20px; }
+.guess-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--c); border-radius: 12px; padding: 12px 14px; }
+.guess-row .name { display: flex; gap: 8px; align-items: baseline; font-weight: 600; }
+.guess-row .name svg { color: var(--c); }
+.guess-row .seg button { transition: background 150ms var(--ease), color 150ms var(--ease); }
+.guess-row .seg button[aria-checked="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); font-weight: 600; }
+@media (max-width: 560px) { .guess-row { flex-direction: column; align-items: stretch; gap: 10px; } .guess-row .seg { display: grid; grid-template-columns: repeat(3, 1fr); } }
+.btn[disabled] { opacity: .45; cursor: default; }
+.btn.primary[disabled]:hover { filter: none; }
 .prompt { font-family: var(--serif); font-size: clamp(1.3rem, 3.2vw, 1.6rem); line-height: 1.35; margin: 10px 0 24px; font-weight: 400; }
 .options { display: grid; gap: 10px; }
 .opt {
@@ -166,6 +176,24 @@ kbd { font: 500 .75rem var(--sans); border: 1px solid var(--line); border-bottom
 .history .dot { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
 .history text { fill: var(--muted); font: 11px var(--sans); }
 .history .grid { stroke: var(--line); }
+.calib { display: grid; margin-top: 12px; font-size: .925rem; }
+.calib-head, .calib-row { display: grid; grid-template-columns: minmax(150px, 1.4fr) 1fr 1fr 12.5em; gap: 12px; align-items: center; padding: 9px 0; }
+.calib-row { border-top: 1px solid var(--line); }
+.calib-row .label { display: flex; align-items: center; gap: 8px; }
+.calib-row .label svg { color: var(--c); }
+.calib-row .gap { font-weight: 600; text-align: right; white-space: nowrap; }
+.calib-head span:last-child { text-align: right; }
+.calib-row.over .gap { color: var(--terra); }
+.calib-row.under .gap { color: var(--accent); }
+.calib-row.even .gap { color: var(--muted); font-weight: 500; }
+@media (max-width: 560px) {
+  .calib-head { display: none; }
+  .calib-row { display: flex; flex-wrap: wrap; gap: 2px 6px; }
+  .calib-row .label { flex-basis: 100%; }
+  .calib-row span { white-space: nowrap; }
+  .calib-row span:nth-child(2)::after { content: ' →'; color: var(--muted); }
+  .calib-row .gap { margin-left: auto; }
+}
 details.review summary { cursor: pointer; font-weight: 500; padding: 4px 0; }
 .review-item { padding: 12px 0; border-top: 1px solid var(--line); font-size: .925rem; }
 .review-item .q { font-family: var(--serif); font-size: 1.05rem; margin-bottom: 4px; }

@@ -1,7 +1,7 @@
 # Instructions
 
 ## Use it
-Open the site, press **Start the quiz** (or Enter), and answer with keys **1–4**. Press **Enter** for the next question and **Esc** to save and exit.
+Open the site and press **Start the quiz** (or Enter). First guess a band (Start here, Solid or Strong) for each of the six skills, or press **Skip the guess**. Then answer with keys **1–4**. Each scenario's skill is named only after you answer. Press **Enter** for the next question and **Esc** to save and exit.
 **⌘,** (Ctrl+, on Windows/Linux) opens Settings: theme, explanations on or off, reduce motion, and clear history.
 Your answers stay in your browser (localStorage). **Copy share link** shares only your six scores.
 

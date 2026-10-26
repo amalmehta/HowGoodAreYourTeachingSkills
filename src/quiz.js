@@ -56,6 +56,24 @@ export function band(score) {
   return BANDS.find((b) => score >= b.min);
 }
 
+// Band names from lowest to highest, so a band's index is its step: 0 Start here, 1 Solid, 2 Strong.
+export const BAND_STEPS = BANDS.map((b) => b.name).reverse();
+
+// Calibration gap per skill: scored band minus guessed band, in band steps (−2…+2).
+// Below 0 is over-confident, above 0 under-confident, 0 calibrated. Skills without a
+// valid guess are left out; null when there is nothing to compare (guess skipped).
+export function calibration(guesses, scores) {
+  if (!guesses || typeof guesses !== 'object') return null;
+  const rows = [];
+  for (const k of SKILLS) {
+    const g = BAND_STEPS.indexOf(guesses[k.id]);
+    if (g < 0 || typeof scores[k.id] !== 'number') continue;
+    const s = BAND_STEPS.indexOf(band(scores[k.id]).name);
+    rows.push({ skill: k.id, guess: BAND_STEPS[g], scored: BAND_STEPS[s], gap: s - g });
+  }
+  return rows.length ? rows : null;
+}
+
 // Lowest score; ties go to the skill listed first.
 export function weakest(scores) {
   return SKILLS.reduce((low, k) => (scores[k.id] < scores[low.id] ? k : low), SKILLS[0]);

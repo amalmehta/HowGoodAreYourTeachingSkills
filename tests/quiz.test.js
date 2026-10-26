@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SKILLS, SCENARIOS } from '../src/content.js';
-import { drawRun, scoreRun, toScore, band, weakest, encodeShare, decodeShare, overall } from '../src/quiz.js';
+import { drawRun, scoreRun, toScore, band, weakest, encodeShare, decodeShare, overall, calibration, BAND_STEPS } from '../src/quiz.js';
 import { sanitize, defaults } from '../src/store.js';
-import { allBest, allWorst, mixed, corruptStorage, badShareCodes } from './fixtures.js';
+import { allBest, allWorst, mixed, corruptStorage, badShareCodes, guessAll, badGuesses } from './fixtures.js';
 
 // Small seeded RNG (mulberry32) so runs are reproducible.
 const rng = (seed) => () => {
@@ -102,4 +102,29 @@ test('store.sanitize survives corrupt data', () => {
     assert.equal(typeof d.prefs.explainAfterEach, 'boolean');
   }
   assert.deepEqual(sanitize(defaults()), defaults());
+});
+
+test('band steps run low to high: Start here 0, Solid 1, Strong 2', () => {
+  assert.deepEqual(BAND_STEPS, ['Start here', 'Solid', 'Strong']);
+});
+
+test('calibration: gap = scored band minus guessed band, in steps', () => {
+  const scores = { explain: 100, examples: 56, check: 33, feedback: 78, practice: 44, difficulty: 45 };
+  const rows = calibration(guessAll('Solid'), scores);
+  assert.deepEqual(rows.map((r) => r.gap), [1, 0, -1, 1, -1, 0]);
+  assert.deepEqual(rows[2], { skill: 'check', guess: 'Solid', scored: 'Start here', gap: -1 });
+});
+
+test('calibration extremes: guessed Strong, scored 0 is −2; guessed Start here, scored 100 is +2', () => {
+  const zero = Object.fromEntries(SKILLS.map((k) => [k.id, 0]));
+  const full = Object.fromEntries(SKILLS.map((k) => [k.id, 100]));
+  assert.ok(calibration(guessAll('Strong'), zero).every((r) => r.gap === -2));
+  assert.ok(calibration(guessAll('Start here'), full).every((r) => r.gap === 2));
+});
+
+test('calibration: skipped, empty or invalid guesses give null; partial guesses keep only valid skills', () => {
+  const scores = Object.fromEntries(SKILLS.map((k) => [k.id, 56]));
+  for (const g of badGuesses) assert.equal(calibration(g, scores), null, JSON.stringify(g));
+  const rows = calibration({ explain: 'Strong', check: 'Great', feedback: 'Solid' }, scores);
+  assert.deepEqual(rows.map((r) => r.skill), ['explain', 'feedback']);
 });

@@ -1,5 +1,5 @@
 // Sample answer sets: normal, edge and failure cases.
-import { SCENARIOS } from '../src/content.js';
+import { SCENARIOS, SKILLS } from '../src/content.js';
 
 const pickBy = (fn) => Object.fromEntries(SCENARIOS.map((s) => [s.id, s.options.findIndex(fn)]));
 
@@ -19,3 +19,7 @@ export const corruptStorage = [
 ];
 
 export const badShareCodes = ['', '1-2-3', '100-100-100-100-100-101', '50-50-50-50-50-50', 'a-b-c-d-e-f', '-1-0-0-0-0-0', '100-100-100-100-100-100-100'];
+
+// Self-guesses: the same band for every skill, and malformed sets that must yield no calibration.
+export const guessAll = (b) => Object.fromEntries(SKILLS.map((k) => [k.id, b]));
+export const badGuesses = [null, undefined, {}, 'Strong', { explain: 3, check: 'strong' }];

@@ -1,6 +1,6 @@
 // Views, routing, keyboard and dialogs. Logic lives in quiz.js, data in content.js.
 import { SKILLS, FAMILIES, BANDS, SOURCES } from './content.js';
-import { drawRun, scoreRun, scenario, band, weakest, encodeShare, decodeShare } from './quiz.js';
+import { drawRun, scoreRun, scenario, band, weakest, encodeShare, decodeShare, calibration, BAND_STEPS } from './quiz.js';
 import * as store from './store.js';
 
 const REPO = 'https://github.com/amalmehta/HowGoodAreYourTeachingSkills';
@@ -78,8 +78,8 @@ function renderHome() {
   view.innerHTML = `
     <section class="hero">
       <h1>How good are your teaching skills?</h1>
-      <p class="lede">18 short teaching scenarios, about 8 minutes. You pick what you'd do, see what research says after each one,
-      and finish with the one skill to practise next.</p>
+      <p class="lede">A quick guess at six skills, then 18 short teaching scenarios, about 9 minutes. You pick what you'd do, see what research says after each one,
+      and finish with how your guess compared and the one skill to practise next.</p>
       <div class="row">${startBtns}</div>
       <div class="honest">${icon('info')}<p><strong>What this measures:</strong> teaching <em>judgment</em>, meaning whether you'd choose
       the move that research supports. Knowing the right move isn't the same as making it live, so every result comes with a drill to try the next time you teach.</p></div>
@@ -118,7 +118,7 @@ function samplePreview() {
   return `
     <div class="section-title">${icon('msg')} What a question looks like</div>
     <div class="card preview" aria-hidden="true">
-      <span class="chip" style="${color('check')}">${icon('check')} Checking understanding</span>
+      ${hiddenChip()}
       <p class="prompt" style="margin-bottom:14px">You finish explaining recursion. You ask, "Does that make sense?" Everyone nods. What do you do next?</p>
       <div class="options">
         <div class="opt"><kbd>1</kbd><span class="txt">Move on, since everyone has said they understand it</span></div>
@@ -128,27 +128,78 @@ function samplePreview() {
     </div>`;
 }
 
+// Runs saved before the guess step existed have no `guessed` flag; they go straight on.
 function startQuiz() {
-  state.inProgress = { items: drawRun(state.seen), answers: {}, index: 0 };
+  state.inProgress = { items: drawRun(state.seen), answers: {}, index: 0, guesses: {}, guessed: false };
   persist();
   if (location.hash === '#/quiz') render(); else location.hash = '#/quiz';
+}
+
+// ── Self-guess ──────────────────────────────────────────────────
+// Asked before any scenario, so the guess can't be shaped by the questions.
+function renderGuess(p) {
+  view.innerHTML = `
+    <div class="progress"><div class="bar"><i style="width:0"></i></div><span>Before you start</span></div>
+    <h1 style="font-size:clamp(1.6rem,4vw,2.1rem)">First, a quick guess</h1>
+    <p class="muted">How would you rate yourself on each skill today? Go with your gut. At the end you'll see each guess next to your result.
+    The gap between them is your <strong>calibration</strong>: how well your confidence matches your judgment. People's sense of their own
+    skill only loosely tracks how they actually do, so the gap is often the most useful thing you'll learn.</p>
+    <div class="guess-list">
+      ${SKILLS.map((k) => `
+        <div class="guess-row" style="${color(k.id)}">
+          <div class="label"><div class="name">${icon(k.id)} ${k.name}</div><div class="muted small">${esc(k.short)}</div></div>
+          <div class="seg" role="radiogroup" aria-label="${esc(k.name)}">
+            ${BAND_STEPS.map((b) => `<button role="radio" data-guess="${k.id}" data-band="${b}" aria-checked="${p.guesses[k.id] === b}">${b}</button>`).join('')}
+          </div>
+        </div>`).join('')}
+    </div>
+    <p class="muted small" style="margin-top:14px"><span class="label-est">Our bands</span> Start here · Solid · Strong are the same bands your result uses.</p>
+    <div class="quiz-foot">
+      <button class="btn quiet" data-act="skip-guess">Skip the guess</button>
+      <button class="btn primary" data-act="guess-done" ${guessComplete(p) ? '' : 'disabled'}>Start the scenarios ${icon('arrow')} <kbd>Enter</kbd></button>
+    </div>`;
+}
+
+const guessComplete = (p) => SKILLS.every((k) => BAND_STEPS.includes(p.guesses?.[k.id]));
+
+// Update in place (no re-render) so the pick shows instantly.
+function setGuess(skillId, b) {
+  const p = state.inProgress;
+  p.guesses[skillId] = b;
+  persist();
+  view.querySelectorAll(`[data-guess="${skillId}"]`).forEach((btn) => btn.setAttribute('aria-checked', btn.dataset.band === b));
+  view.querySelector('[data-act="guess-done"]').disabled = !guessComplete(p);
+}
+
+function endGuess(skip) {
+  const p = state.inProgress;
+  if (!p || (!skip && !guessComplete(p))) return;
+  if (skip) p.guesses = null;
+  p.guessed = true;
+  persist();
+  render();
+}
+
+// The skill stays unnamed until the person answers, so a guess can't steer the pick.
+function hiddenChip() {
+  return `<span class="chip concealed">${icon('info')} Skill shown after you answer</span>`;
 }
 
 // ── Quiz ────────────────────────────────────────────────────────
 function renderQuiz() {
   const p = state.inProgress;
   if (!p) return startQuiz();
+  if (p.guessed === false) return renderGuess(p);
   const item = p.items[p.index];
   const s = scenario(item.id);
   if (!s) { console.warn('[quiz] unknown scenario, restarting', item.id); return startQuiz(); }
-  const k = skillById[s.skill];
   const n = p.items.length;
 
   view.innerHTML = `
     <div class="progress" aria-label="Question ${p.index + 1} of ${n}">
       <div class="bar"><i style="width:${(p.index / n) * 100}%"></i></div><span>${p.index + 1} / ${n}</span>
     </div>
-    <span class="chip" style="${color(k.id)}">${icon(k.id)} ${k.name}</span>
+    <span id="skill-chip">${hiddenChip()}</span>
     <p class="prompt">${esc(s.prompt)}</p>
     <div class="options" id="opts">
       ${item.order.map((orig, pos) => `
@@ -183,6 +234,8 @@ function choose(orig) {
 
 // Update in place (no re-render) so the response is instant.
 function showAnswer(s, picked) {
+  const k = skillById[s.skill];
+  view.querySelector('#skill-chip').innerHTML = `<span class="chip" style="${color(k.id)}">${icon(k.id)} ${k.name}</span>`;
   const opts = view.querySelector('#opts');
   opts.classList.add('answered');
   opts.querySelectorAll('.opt').forEach((btn) => {
@@ -220,9 +273,9 @@ function next() {
 }
 
 function finish() {
-  const { items, answers } = state.inProgress;
+  const { items, answers, guesses = null } = state.inProgress;
   const { scores, overall } = scoreRun(items, answers);
-  state.history.push({ date: new Date().toISOString(), scores, overall, items, answers });
+  state.history.push({ date: new Date().toISOString(), scores, overall, items, answers, guesses });
   state.history = state.history.slice(-50);
   state.seen = [...new Set([...state.seen, ...items.map((i) => i.id)])];
   state.inProgress = null;
@@ -292,6 +345,8 @@ function renderResult() {
       Read the bands as rough signals. <span class="label-est">Our thresholds</span> 0–44 Start here · 45–77 Solid · 78–100 Strong. These are not research norms.</p>
     </div>
 
+    ${calibrationBlock(entry)}
+
     <div class="row" style="margin-top:20px">
       <button class="btn primary" data-act="share">${icon('link')} Copy share link</button>
       <button class="btn" data-act="start">${icon('redo')} Retake</button>
@@ -303,6 +358,44 @@ function renderResult() {
     ${reviewBlock(entry)}
   `;
   animateBars();
+}
+
+const GAP_LABEL = (gap) => (gap === 0 ? 'Calibrated' : gap < 0 ? 'Over-confident' : 'Under-confident');
+
+function calibrationBlock(entry) {
+  const rows = calibration(entry.guesses, entry.scores);
+  if (!rows) {
+    return `<div class="section-title">${icon('target')} Your guess vs your result</div>
+      <p class="muted">You skipped the guess this time. Next run, guess first to see how well your confidence matches your judgment.</p>`;
+  }
+  const over = rows.filter((r) => r.gap < 0).length;
+  const under = rows.filter((r) => r.gap > 0).length;
+  const even = rows.length - over - under;
+  const summary = over > under + even ? 'Mostly, you rated yourself higher than you scored.'
+    : under > over + even ? 'Mostly, you rated yourself lower than you scored.'
+    : 'Your guesses were close to your results overall.';
+  return `
+    <div class="section-title">${icon('target')} Your guess vs your result</div>
+    <div class="card">
+      <p style="margin:0 0 4px"><strong>${summary}</strong></p>
+      <p class="muted small">Calibrated on ${even} of ${rows.length} skills · over-confident on ${over} · under-confident on ${under}.</p>
+      <div class="calib">
+        <div class="calib-head muted small"><span>Skill</span><span>You guessed</span><span>You scored</span><span></span></div>
+        ${rows.map((r) => {
+          const k = skillById[r.skill];
+          const dir = r.gap === 0 ? 'even' : r.gap < 0 ? 'over' : 'under';
+          const steps = Math.abs(r.gap);
+          return `<div class="calib-row ${dir}" style="${color(k.id)}">
+            <span class="label">${icon(k.id)} ${k.name}</span>
+            <span>${r.guess}</span>
+            <span>${r.scored}</span>
+            <span class="gap">${GAP_LABEL(r.gap)}${steps ? ` · ${steps} band${steps > 1 ? 's' : ''}` : ''}</span>
+          </div>`;
+        }).join('')}
+      </div>
+      <p class="muted small" style="margin:14px 0 0">Gaps are counted in bands, not points. Each skill rests on 3 questions, so a single answer
+      can move a skill by a band or even two. Read one skill's gap as a hint. A pattern across most skills says more about your calibration than any one row.</p>
+    </div>`;
 }
 
 function historyBlock() {
@@ -430,6 +523,19 @@ function renderMethod() {
       ${BANDS.map((b, i) => `<tr><td>${b.name}</td><td>${b.min}–${i === 0 ? 100 : BANDS[i - 1].min - 1}</td><td class="muted">${b.note}</td></tr>`).join('')}
     </table>
     <p class="muted small" style="margin-top:8px">These cut-offs are invented for readability. They are not drawn from research norms.</p>
+
+    <h3 style="margin-top:24px">Your guess and calibration</h3>
+    <p>Before the scenarios you guess a band for each skill. Afterwards each guess is compared with the band you scored.</p>
+    ${eq('G_k = b(S_k) - g_k', 'G<sub>k</sub> = b(S<sub>k</sub>) − g<sub>k</sub>')}
+    <ul class="defs">
+      <li><strong>G<sub>k</sub></strong>: the calibration gap for skill k, in band steps, from −2 to +2</li>
+      <li><strong>b(S<sub>k</sub>)</strong>: the band you scored, counted as a step: Start here = 0, Solid = 1, Strong = 2</li>
+      <li><strong>g<sub>k</sub></strong>: the band you guessed, counted the same way</li>
+    </ul>
+    <p>In words: below 0 means you rated yourself higher than you scored (over-confident), above 0 lower (under-confident), and 0 calibrated.
+    Gaps use bands rather than points because one answer moves a skill score by up to 33 points, so a gap of "guessed 70, scored 56" would be mostly noise.</p>
+    <p>Why ask at all? How good people think they are only loosely tracks how they perform, so a self-rating on its own mostly measures confidence.
+    Putting it next to an objective score turns that bias into something you can see.</p>
 
     <h3 style="margin-top:24px">Retakes</h3>
     <p>There are 36 scenarios, two for each of the 18 question slots. Each run draws 18 and prefers the ones you haven't seen.
@@ -587,7 +693,11 @@ async function share() {
 view.addEventListener('click', (e) => {
   const opt = e.target.closest('.opt[data-orig]');
   if (opt && !opt.disabled) return choose(+opt.dataset.orig);
+  const g = e.target.closest('[data-guess]');
+  if (g) return setGuess(g.dataset.guess, g.dataset.band);
   const act = e.target.closest('[data-act]')?.dataset.act;
+  if (act === 'guess-done') endGuess(false);
+  if (act === 'skip-guess') endGuess(true);
   if (act === 'start') startQuiz();
   if (act === 'next') next();
   if (act === 'share') share();
@@ -606,7 +716,10 @@ document.addEventListener('keydown', (e) => {
   if (document.querySelector('dialog[open]') || e.metaKey || e.ctrlKey || e.altKey) return;
   if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
   const route = location.hash.split('/')[1] || '';
-  if (route === 'quiz' && state.inProgress) {
+  if (route === 'quiz' && state.inProgress?.guessed === false) {
+    if (e.key === 'Enter') { e.preventDefault(); endGuess(false); }
+    else if (e.key === 'Escape') location.hash = '#/';
+  } else if (route === 'quiz' && state.inProgress) {
     if (/^[1-4]$/.test(e.key)) {
       const btn = view.querySelectorAll('.opt')[+e.key - 1];
       if (btn && !btn.disabled) choose(+btn.dataset.orig);
